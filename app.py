@@ -12,6 +12,10 @@ genai.configure(api_key=os.getenv("AI_API_KEY"))
 app = Flask(__name__)
 CORS(app)
 
+# Model configuration
+TEXT_MODEL = "models/gemini-2.5-pro"
+TTS_MODEL = "models/gemini-1.5-flash-tts"
+
 # Helper: Get parameter for GET/POST
 def get_param(name, default=None):
     if request.method == "GET":
@@ -27,17 +31,15 @@ def get_param(name, default=None):
 def handle_text():
     try:
         prompt = get_param("prompt")
-        model_name = get_param("model", "models/gemini-2.5-flash")
-
         if not prompt:
             return jsonify({"error": "Missing prompt"}), 400
 
-        model = genai.GenerativeModel(model_name)
+        model = genai.GenerativeModel(TEXT_MODEL)
         response = model.generate_content(prompt)
 
         return jsonify({
             "response": response.text.strip(),
-            "model": model_name
+            "model": TEXT_MODEL
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -48,31 +50,30 @@ def handle_text():
 def handle_voice():
     try:
         prompt = get_param("prompt")
-        model_name = get_param("model", "models/gemini-2.5-flash")
-
         if not prompt:
             return jsonify({"error": "Missing prompt"}), 400
 
-        # Step 1: Generate AI text response
-        text_model = genai.GenerativeModel(model_name)
-        text_response = text_model.generate_content(prompt)
-        text_output = text_response.text.strip()
+        # Step 1: Text generation using 2.5 Pro
+        text_model = genai.GenerativeModel(TEXT_MODEL)
+        text_resp = text_model.generate_content(prompt)
+        text = text_resp.text.strip()
 
-        # Step 2: Convert text to speech using Gemini 2.5 Flash TTS
-        tts_model = genai.GenerativeModel("models/gemini-2.5-flash-tts")
-        audio_response = tts_model.generate_content(
-            [text_output],
+        # Step 2: Voice synthesis using light (1.5 Flash TTS)
+        tts_model = genai.GenerativeModel(TTS_MODEL)
+        audio_resp = tts_model.generate_content(
+            [text],
             generation_config={"response_mime_type": "audio/wav"}
         )
 
-        # Step 3: Encode WAV audio as base64
-        audio_base64 = base64.b64encode(audio_response.audio).decode("utf-8")
+        # Step 3: Encode audio to Base64
+        audio_base64 = base64.b64encode(audio_resp.audio).decode("utf-8")
 
         return jsonify({
-            "text": text_output,
+            "text": text,
             "audio_base64": audio_base64,
             "mime_type": "audio/wav",
-            "model": model_name
+            "text_model": TEXT_MODEL,
+            "tts_model": TTS_MODEL
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -88,7 +89,7 @@ def transcribe_voice():
         audio_file = request.files["file"]
         audio_bytes = audio_file.read()
 
-        stt_model = genai.GenerativeModel("models/gemini-2.5-flash-tts")
+        stt_model = genai.GenerativeModel(TTS_MODEL)
         response = stt_model.generate_content(
             [audio_bytes],
             generation_config={"response_mime_type": "text/plain"}
@@ -105,13 +106,12 @@ def home():
     return jsonify({
         "message": "AI API Layer is running 🚀",
         "models": {
-            "default_text": "models/gemini-2.5-flash",
-            "default_tts": "models/gemini-2.5-flash-tts",
-            "optional": "models/gemini-2.5-pro"
+            "text": TEXT_MODEL,
+            "voice": TTS_MODEL
         },
         "endpoints": {
-            "GET/POST /api/text": "Text generation",
-            "GET/POST /api/voice": "Text + Voice generation",
+            "GET/POST /api/text": "Text generation (Gemini 2.5 Pro)",
+            "GET/POST /api/voice": "Text + Voice output (Pro + Flash-TTS)",
             "POST /api/voice/transcribe": "Speech-to-text"
         }
     })
