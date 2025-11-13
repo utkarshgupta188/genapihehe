@@ -15,7 +15,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Model configuration
-TEXT_MODEL = "models/gemini-2.5-pro"   # Best reasoning
+TEXT_MODEL = "models/gemini-2.5-flash"   # Best reasoning
 TTS_ENGINE = "gTTS (Google Text-to-Speech)"  # Free voice engine
 
 # Helper: Get parameter from GET/POST
